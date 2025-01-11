@@ -137,3 +137,4 @@ def sendDiscordNotification(title, message, webhookUrl) {
         ${webhookUrl}
     """
 }
+
