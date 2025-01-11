@@ -1,15 +1,20 @@
 pipeline {
     agent any
 
+    tools {
+        gradle 'Gradle-8.11.1'
+    }
+
     environment {
         // 환경변수 이름에 맞춰서 수정
-        DISCORD_WEBHOOK_URL_DEV = "${env.A1GRADE_DISCORD_WEBHOOK_URL_DEV}"
-        DISCORD_WEBHOOK_URL_PROD = "${env.A1GRADE_DISCORD_WEBHOOK_URL_PROD}"
-        REGISTRY_CREDENTIAL = "${env.A1GRADE_DOCKERHUB_CREDENTIAL}"
-        SSH_CREDENTIAL_ID = "${env.A1GRADE_SSH_CREDENTIAL}"
-        GIT_URL = "${env.A1GRADE_GIT_URL}"
-        IMAGENAME = "${env.A1GRADE_IMAGENAME}"
-        SPRING_SERVER = "${env.A1GRADE_SPRING_SERVER}"
+        DISCORD_WEBHOOK_URL_DEV = "${env.TEST_DISCORD_WEBHOOK_URL_DEV}"
+        DISCORD_WEBHOOK_URL_PROD = "${env.TEST_DISCORD_WEBHOOK_URL_PROD}"
+        REGISTRY_CREDENTIAL = "${env.TEST_DOCKERHUB_CREDENTIAL}"
+        SSH_CREDENTIAL_ID = "${env.TEST_SSH_CREDENTIAL}"
+        GIT_URL = "${env.TEST_GIT_URL}"
+        IMAGE_NAME = "${env.TEST_IMAGE_NAME}"
+        CONTAINER_NAME = "${env.TEST_CONTAINER_NAME}"
+        SPRING_SERVER = "${env.TEST_SPRING_SERVER}"
 
         // 태그 설정
         TAG = "${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
@@ -51,11 +56,11 @@ pipeline {
             steps {
                 echo 'Building Docker Image with Tag'
                 script {
-                    def imageNameWithTag = "${env.IMAGENAME}:${env.TAG}"
+                    def IMAGE_NAMEWithTag = "${env.IMAGE_NAME}:${env.TAG}"
                     if (env.BRANCH_NAME == 'main') {
-                        dockerImage = docker.build(imageNameWithTag)
+                        dockerImage = docker.build(IMAGE_NAMEWithTag)
                     } else if (env.BRANCH_NAME == 'develop') {
-                        dockerImage = docker.build(imageNameWithTag)
+                        dockerImage = docker.build(IMAGE_NAMEWithTag)
                     } else {
                         error "Unknown branch ${env.BRANCH_NAME}, aborting!"
                     }
@@ -72,9 +77,9 @@ pipeline {
             steps {
                 echo 'Pushing Docker Image with Tag'
                 script {
-                    def imageNameWithTag = "${env.IMAGENAME}:${env.TAG}"
+                    def IMAGE_NAMEWithTag = "${env.IMAGE_NAME}:${env.TAG}"
                     docker.withRegistry('', env.REGISTRY_CREDENTIAL) {
-                        dockerImage.push(imageNameWithTag)
+                        dockerImage.push(IMAGE_NAMEWithTag)
                     }
                 }
             }
@@ -89,9 +94,9 @@ pipeline {
             steps {
                 echo 'Running Docker Container with Tag'
                 sshagent(credentials: [env.SSH_CREDENTIAL_ID]) {
-                    sh "ssh -o StrictHostKeyChecking=no ubuntu@${env.SPRING_SERVER} 'docker pull ${env.IMAGENAME}:${env.TAG}'"
-                    sh "ssh -o StrictHostKeyChecking=no ubuntu@${env.SPRING_SERVER} 'docker ps -q --filter name=a1grade-springboot | grep -q . && docker rm -f \$(docker ps -aq --filter name=a1grade-springboot)'"
-                    sh "ssh -o StrictHostKeyChecking=no ubuntu@${env.SPRING_SERVER} 'docker run -d --name a1grade-springboot -p 8080:8080 ${env.IMAGENAME}:${env.TAG}'"
+                    sh "ssh -o StrictHostKeyChecking=no ubuntu@${env.SPRING_SERVER} 'docker pull ${env.IMAGE_NAME}:${env.TAG}'"
+                    sh "ssh -o StrictHostKeyChecking=no ubuntu@${env.SPRING_SERVER} 'docker ps -q --filter name=${env.CONTAINER_NAME} | grep -q . && docker rm -f \$(docker ps -aq --filter name=${env.CONTAINER_NAME})'"
+                    sh "ssh -o StrictHostKeyChecking=no ubuntu@${env.SPRING_SERVER} 'docker run -d --name ${env.CONTAINER_NAME} -p 8080:8080 ${env.IMAGE_NAME}:${env.TAG}'"
                 }
             }
         }
